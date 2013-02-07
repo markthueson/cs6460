@@ -45,29 +45,70 @@ int main(int argc,char *argv[])
     if(val == 0)
     {
 	int fd = open("/dev/input/mouse0",O_RDONLY);
+	if(fd < 0)
+	{
+	    fprintf(stderr, "Could not open mouse0\n");
+	    exit(EXIT_FAILURE);
+	}
 	char ch = 'A';
 	while(1)
 	{	 
 	    int i = read(fd,&ch,1);
 	    if(i == 1)
 		printf("%i\n",(int)ch);
+	    else
+	    {
+		fprintf(stderr, "Error reading from mouse0\n");
+		exit(EXIT_FAILURE);
+	    }
 	}
-	close(fd);
+	int retval = close(fd);
+	if(retval != 0)
+	{
+	    fprintf(stderr, "Error closing mouse0\n");
+	    exit(EXIT_FAILURE);
+	}
     }
     else if(val == 1)
     {
 	struct timeval tv1;
 	struct timeval tv2;
 	int fd_in = open("/dev/urandom",O_RDONLY);
+	if(fd_in < 0)
+	{
+	    fprintf(stderr, "Could not open urandom\n");
+	    exit(EXIT_FAILURE);
+	}
 	int fd_out = open("/dev/null",O_WRONLY);
+	if(fd_out < 0)
+	{
+	    fprintf(stderr, "Could not open null\n");
+	    exit(EXIT_FAILURE);
+	}
 	int count = 10000000;
 	char *buf = malloc(10000000);
+	if(buf == NULL)
+	{
+	    fprintf(stderr, "Could not allocate buffer\n");
+	    exit(EXIT_FAILURE);
+	}
 	gettimeofday(&tv1,NULL);
 	while(count > 0)
 	{
 	    int i = read(fd_in,buf,count);
+	    if(i < 0)
+	    {
+		fprintf(stderr, "Error reading from urandom\n");
+		exit(EXIT_FAILURE);
+	    }
+
 	    count = count - i;
 	    i = write(fd_out,buf,i);
+	    if(i < 0)	    
+	    {
+		fprintf(stderr, "Error writing to null\n");
+		exit(EXIT_FAILURE);
+	    }
 	}
 	gettimeofday(&tv2,NULL);
 	long int seconds = tv2.tv_sec-tv1.tv_sec;
@@ -78,22 +119,50 @@ int main(int argc,char *argv[])
 	    useconds = -useconds;
 	}
 	printf("%ld.%ld seconds elapsed\n",seconds, useconds);
-	close(fd_in);
-	close(fd_out);
+	int retval = close(fd_in);
+	if(retval != 0)
+	{
+	    fprintf(stderr, "Error closing mouse0\n");
+	    exit(EXIT_FAILURE);
+	}
+	retval = close(fd_out);
+	if(retval != 0)
+	{
+	    fprintf(stderr, "Error closing mouse0\n");
+	    exit(EXIT_FAILURE);
+	}
     }
     else if (val == 2)
     {
-	printf("use ticket\n");
 	int fd = open("/dev/ticket0",O_RDONLY);
+	if(fd < 0)
+	{
+	    fprintf(stderr, "Could not open ticket0\n");
+	    exit(EXIT_FAILURE);
+	}
 	int i = 0;
-	char buf[4];
+	char buf[8];
+	printf("pre %x\n",*buf);
 	for(i=0;i<10;++i)
 	{
 	    int i = read(fd,buf,4);
 	    if(i != 4)
-		printf("error on ticket read\n");
+	    {
+		fprintf(stderr,"Error reading from ticket0\n");
+		exit(EXIT_FAILURE);
+	    }
 	    else
-		printf("ticket %d\n",(int)buf);
+	    {
+		printf("ticket %x\n",(unsigned int)*buf);
+		printf("ticket %d\n",(int)*buf);
+	    }
+	    sleep(1);
+	}
+	int retval = close(fd);
+	if(retval < 0)
+	{
+	    fprintf(stderr,"Could not close ticket0\n");
+	    exit(EXIT_FAILURE);
 	}
     }
 

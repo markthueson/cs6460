@@ -1,0 +1,1 @@
+cmd_/home/thueson/cs6460/hw2/kern/ticket.ko := ld -r -m elf_i386 -T /usr/src/linux-headers-3.2.0-36-generic-pae/scripts/module-common.lds --build-id  -o /home/thueson/cs6460/hw2/kern/ticket.ko /home/thueson/cs6460/hw2/kern/ticket.o /home/thueson/cs6460/hw2/kern/ticket.mod.o
