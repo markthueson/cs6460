@@ -5,10 +5,13 @@
 #include <errno.h>
 #include <limits.h>
 #include <assert.h>
+#include <math.h>
 
-#define BAKERY
-//#define MY_SPIN
+//#define MY_PTHREAD
 //#define FAIR_SPIN
+//#define MY_SPIN
+#define BAKERY
+
  
 time_t stop;
 long producers;
@@ -17,6 +20,28 @@ volatile int *cs_entries;
 volatile int in_cs = 0;
 volatile int next_enq = 0;
 volatile int next_deq = 0;
+
+#ifdef MY_PTHREAD
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+struct spin_lock_t {			//added just to conform to other API
+    volatile int placeholder;
+};
+
+struct spin_lock_t thread_lock;
+
+void spin_lock (struct spin_lock_t *s)
+{
+    s->placeholder = 1;
+    pthread_mutex_lock(&mutex);
+}
+
+void spin_unlock (struct spin_lock_t *s)
+{
+    s->placeholder = 0;
+    pthread_mutex_unlock(&mutex);
+}
+#endif
 
 #ifdef FAIR_SPIN
 /*
@@ -146,6 +171,7 @@ volatile int *number;
 void *thr_func(void *arg) {
     thread_data_t *data = (thread_data_t *)arg;
 
+    int retval;
     choosing[data->tid] = 0;
     number[data->tid] = 0;
     cs_entries[data->tid] = 0;
@@ -183,7 +209,27 @@ void *thr_func(void *arg) {
 	in_cs++;
 	assert(in_cs == 3);
 	in_cs = 0;
-	cs_entries[data->tid] += 1;
+	/* Producers continally enqueue a counting value so it is easy to compare when dequeued.
+	   Since the value is always increasing a dropped, duplicate, or out of order queue/dequeue
+	   would be easily detected. */
+	if(data->tid < producers)  //producer thread
+	{
+	    if(enq(next_enq))
+	    {
+	        next_enq += 1;
+	        //printf("queued %d\n",next_enq);
+	        cs_entries[data->tid] += 1;
+	    }
+	}
+	else			//consumer thread
+	{
+	    if(deq(&retval))
+	    {
+	        cs_entries[data->tid] += 1;
+	        //printf("expected:%d dequeued:%d\n",next_deq,retval);
+	        assert(retval == next_deq++);
+	    }
+	}
 	//end of critical section
 
 	/* A fence is needed at the end of the critical section to ensure that all 
@@ -223,6 +269,9 @@ void *thr_func(void *arg) {
 	in_cs++;
 	assert(in_cs == 3);
 	in_cs = 0;
+	/* Producers continally enqueue a counting value so it is easy to compare when dequeued.
+	   Since the value is always increasing a dropped, duplicate, or out of order queue/dequeue
+	   would be easily detected. */
 	if(data->tid < producers)  //producer thread
 	{
 	    if(enq(next_enq))
@@ -348,10 +397,49 @@ int main(int argc, char **argv) {
       pthread_join(thr[i], NULL);
     }
 
+    double pro_avg = 0;
+    double con_avg = 0;
+    // print results
     for(i=0;i<producers;++i)
+    {
+	pro_avg += cs_entries[i];
 	printf("Producer %d queued %d items\n",i,cs_entries[i]);
+    }
     for(i=producers;i<(producers + consumers);++i)
+    {
+	con_avg += cs_entries[i];
 	printf("Consumer %d dequeued %d items\n",i,cs_entries[i]);
+    }
+
+    //calc std deviation
+
+    //find mean of producers and consumers
+    pro_avg = pro_avg/producers;
+    con_avg = con_avg/consumers;
+
+    //compute deviation squared for each
+    double pro_dev[producers];
+    double con_dev[consumers];
+    double pro_result = 0;
+    double con_result = 0;
+    for(i=0;i<producers;++i)
+    {
+	pro_dev[i] = (pro_avg - cs_entries[i]) * (pro_avg - cs_entries[i]);
+	pro_result += pro_dev[i];
+    }
+    for(i=producers;i<(producers + consumers);++i)
+    {
+	con_dev[i] = (con_avg - cs_entries[i]) * (con_avg - cs_entries[i]);
+	con_result += con_dev[i];
+    }
+
+    //divide by N and sqrt to find std dev
+    pro_result = pro_result/(producers);
+    con_result = con_result/(consumers);
+    double pro_deviation = sqrt(pro_result);
+    double con_deviation = sqrt(con_result);
+    printf("Std dev of Producers is %f\n",pro_deviation);
+    printf("Std dev of Consumers is %f\n",con_deviation);
  
     return EXIT_SUCCESS;
 }

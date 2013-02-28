@@ -1,0 +1,6 @@
+Producer 0 queued 831 items
+Producer 1 queued 831 items
+Consumer 2 dequeued 831 items
+Consumer 3 dequeued 830 items
+Std dev of Producers is 0.000000
+Std dev of Consumers is 0.500000
