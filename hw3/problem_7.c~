@@ -14,72 +14,9 @@ time_t stop;
 long producers;
 long consumers;
 volatile int *cs_entries;
-volatile int *cs_entries_con;
 volatile int in_cs = 0;
 volatile int next_enq = 0;
 volatile int next_deq = 0;
-
-#ifdef BAKERY
-volatile int *choosing;
-volatile int *number;
-
-void *pro_func(void *arg) {
-    thread_data_t *data = (thread_data_t *)arg;
-
-    choosing[data->tid] = 0;
-    number[data->tid] = 0;
-    cs_entries[data->tid] = 0;
- 
-    while(time(NULL) < stop)
-    {
-	choosing[data->tid] = 1;
-	int i;
-	int max = 0;
-	for(i=0;i<thread_num;++i)
-	    if(max < number[i])
-		max = number[i];
-	number[data->tid] = max + 1;
-	/* A fence is needed here to make sure that another thread doesn't see the next step
-	   of setting choosing to 0 without seeing the change to the number.  Without this
-	   fence it would be possible for a thread with a larger number (or equal number and
-	   higher id) to access the critical section out of order.  This would also cause the
-	   thread with the smaller number to enter the critical section when it reaches it, breaking
-	   mutual exclusion. */
-	mfence();
-	choosing[data->tid] = 0;
-
-	for(i=0;i<thread_num;++i)
-	{
-	    while(choosing[i]);
-	    while((number[i] != 0) && ((number[i] < number[data->tid]) || (number[i] == number[data->tid] && i < data->tid)));
-	}
-	
-	//critical section
-	assert(in_cs == 0);
-	in_cs++;
-	assert(in_cs == 1);
-	in_cs++;
-	assert(in_cs == 2);
-	in_cs++;
-	assert(in_cs == 3);
-	in_cs = 0;
-	cs_entries[data->tid] += 1;
-	//end of critical section
-
-	/* A fence is needed at the end of the critical section to ensure that all 
-	   threads see changes to shared data in the critical section.  Without
-	   this fence it should still provide mutual exclusion but data may not
-	   be correct. */
-	mfence();
-	number[data->tid] = 0;
-
-	/* More fences shouldn't be needed since the first one prevents mutual exclusion
-	   from being broken and the second one ensures data coherence. */
-    }
-    pthread_exit(NULL);
-}
-
-#endif
 
 #ifdef FAIR_SPIN
 /*
@@ -202,16 +139,40 @@ void mfence (void) {
   asm volatile ("mfence" : : : "memory");
 }
 
-/* producer function */
-void *pro_func(void *arg) {
+#ifdef BAKERY
+volatile int *choosing;
+volatile int *number;
+/* thread function */
+void *thr_func(void *arg) {
     thread_data_t *data = (thread_data_t *)arg;
 
+    choosing[data->tid] = 0;
+    number[data->tid] = 0;
     cs_entries[data->tid] = 0;
  
     while(time(NULL) < stop)
     {
-	spin_lock(&thread_lock);
+	choosing[data->tid] = 1;
+	int i;
+	int max = 0;
+	for(i=0;i<(producers + consumers);++i)
+	    if(max < number[i])
+		max = number[i];
+	number[data->tid] = max + 1;
+	/* A fence is needed here to make sure that another thread doesn't see the next step
+	   of setting choosing to 0 without seeing the change to the number.  Without this
+	   fence it would be possible for a thread with a larger number (or equal number and
+	   higher id) to access the critical section out of order.  This would also cause the
+	   thread with the smaller number to enter the critical section when it reaches it, breaking
+	   mutual exclusion. */
 	mfence();
+	choosing[data->tid] = 0;
+
+	for(i=0;i<thread_num;++i)
+	{
+	    while(choosing[i]);
+	    while((number[i] != 0) && ((number[i] < number[data->tid]) || (number[i] == number[data->tid] && i < data->tid)));
+	}
 	
 	//critical section
 	assert(in_cs == 0);
@@ -222,12 +183,7 @@ void *pro_func(void *arg) {
 	in_cs++;
 	assert(in_cs == 3);
 	in_cs = 0;
-	if(enq(next_enq))
-	{
-	    next_enq += 1;
-	    //printf("queued %d\n",next_enq);
-	    cs_entries[data->tid] += 1;
-	}
+	cs_entries[data->tid] += 1;
 	//end of critical section
 
 	/* A fence is needed at the end of the critical section to ensure that all 
@@ -235,7 +191,7 @@ void *pro_func(void *arg) {
 	   this fence it should still provide mutual exclusion but data may not
 	   be correct. */
 	mfence();
-	spin_unlock(&thread_lock);
+	number[data->tid] = 0;
 
 	/* More fences shouldn't be needed since the first one prevents mutual exclusion
 	   from being broken and the second one ensures data coherence. */
@@ -243,11 +199,14 @@ void *pro_func(void *arg) {
     pthread_exit(NULL);
 }
 
-/* consumer function */
-void *con_func(void *arg) {
+#endif
+
+#ifndef BAKERY
+/* thread function */
+void *thr_func(void *arg) {
     thread_data_t *data = (thread_data_t *)arg;
 
-    cs_entries_con[data->tid] = 0;
+    cs_entries[data->tid] = 0;
     int retval;
  
     while(time(NULL) < stop)
@@ -264,11 +223,23 @@ void *con_func(void *arg) {
 	in_cs++;
 	assert(in_cs == 3);
 	in_cs = 0;
-	if(deq(&retval))
-        {
-	    cs_entries_con[data->tid] += 1;
-	    //printf("expected:%d dequeued:%d\n",next_deq,retval);
-            assert(retval == next_deq++);
+	if(data->tid < producers)  //producer thread
+	{
+	    if(enq(next_enq))
+	    {
+	        next_enq += 1;
+	        //printf("queued %d\n",next_enq);
+	        cs_entries[data->tid] += 1;
+	    }
+	}
+	else			//consumer thread
+	{
+	    if(deq(&retval))
+	    {
+	        cs_entries[data->tid] += 1;
+	        //printf("expected:%d dequeued:%d\n",next_deq,retval);
+	        assert(retval == next_deq++);
+	    }
 	}
 	//end of critical section
 
@@ -284,7 +255,7 @@ void *con_func(void *arg) {
     }
     pthread_exit(NULL);
 }
-
+#endif
  
 int main(int argc, char **argv) {
 /* Error checking code taken directly from the man page for strtol and adapted */
@@ -351,47 +322,36 @@ int main(int argc, char **argv) {
     }
 
   /* Arguments ok, so proceed */
-    pthread_t pro[producers];
-    pthread_t con[consumers];
+#ifdef BAKERY
+    choosing = malloc(sizeof(int) * (producers + consumers));
+    number = malloc(sizeof(int) * (producers + consumers));
+#endif
+    pthread_t thr[producers + consumers];
     stop = time(NULL) + seconds;
     int i, rc;
     /* create a thread_data_t argument array */
-    thread_data_t pro_data[producers];
-    thread_data_t con_data[consumers];
+    thread_data_t thr_data[producers + consumers];
 
-    cs_entries = malloc(sizeof(int) * producers);
-    cs_entries_con = malloc(sizeof(int) * consumers);
+    cs_entries = malloc(sizeof(int) * (producers + consumers));
  
-    /* create producer threads */
-    for (i = 0; i < producers; ++i) {
-      pro_data[i].tid = i;
-      if ((rc = pthread_create(&pro[i], NULL, pro_func, &pro_data[i]))) {
-        fprintf(stderr, "error: pthread_create, rc: %d\n", rc);
-        return EXIT_FAILURE;
-      }
-    }
-
-    /* create consumer threads */
-    for (i = 0; i < consumers; ++i) {
-      con_data[i].tid = i;
-      if ((rc = pthread_create(&con[i], NULL, con_func, &con_data[i]))) {
+    /* create threads */
+    for (i = 0; i < (producers + consumers); ++i) {
+      thr_data[i].tid = i;
+      if ((rc = pthread_create(&thr[i], NULL, thr_func, &thr_data[i]))) {
         fprintf(stderr, "error: pthread_create, rc: %d\n", rc);
         return EXIT_FAILURE;
       }
     }
 
     /* block until all threads complete */
-    for (i = 0; i < producers; ++i) {
-      pthread_join(pro[i], NULL);
-    }
-    for (i = 0; i < consumers; ++i) {
-      pthread_join(con[i], NULL);
+    for (i = 0; i < (producers + consumers); ++i) {
+      pthread_join(thr[i], NULL);
     }
 
     for(i=0;i<producers;++i)
 	printf("Producer %d queued %d items\n",i,cs_entries[i]);
-    for(i=0;i<consumers;++i)
-	printf("Consumer %d dequeued %d items\n",i,cs_entries_con[i]);
+    for(i=producers;i<(producers + consumers);++i)
+	printf("Consumer %d dequeued %d items\n",i,cs_entries[i]);
  
     return EXIT_SUCCESS;
 }
