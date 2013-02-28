@@ -42,7 +42,8 @@ void *thr_func(void *arg) {
 	for(i=0;i<thread_num;++i)
 	{
 	    while(choosing[i]);
-	    while((number[i] != 0) && ((number[i] < number[data->tid]) || (number[i] == number[data->tid] && i < data->tid)));
+	    while((number[i] != 0) && ((number[i] < number[data->tid]) || (number[i] == number[data->tid] && i < data->tid)))
+		sched_yield();
 	}
 	
 	//critical section

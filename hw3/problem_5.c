@@ -8,10 +8,45 @@
  
 time_t stop;
 long thread_num;
-volatile int *choosing;
-volatile int *number;
 volatile int *cs_entries;
 volatile int in_cs = 0;
+
+/*
+ * atomic_xadd
+ *
+ * equivalent to atomic execution of this code:
+ *
+ * return (*ptr)++;
+ * 
+ */
+static inline int atomic_xadd (volatile int *ptr)
+{
+  register int val __asm__("eax") = 1;
+  asm volatile ("lock xaddl %0,%1"
+  : "+r" (val)
+  : "m" (*ptr)
+  : "memory"
+  );  
+  return val;
+}
+
+struct spin_lock_t {
+    volatile int serving;
+    volatile int next;
+};
+
+struct spin_lock_t thread_lock;
+
+void spin_lock (struct spin_lock_t *s)
+{
+    int retv = atomic_xadd(&s->next);
+    while(retv != s->serving);
+}
+
+void spin_unlock (struct spin_lock_t *s)
+{
+    atomic_xadd(&s->serving);
+}
 
 /* create thread argument struct for thr_func() */
 typedef struct _thread_data_t {
@@ -19,31 +54,20 @@ typedef struct _thread_data_t {
     double stuff;
 } thread_data_t;
  
+void mfence (void) {
+  asm volatile ("mfence" : : : "memory");
+}
+
 /* thread function */
 void *thr_func(void *arg) {
     thread_data_t *data = (thread_data_t *)arg;
 
-    choosing[data->tid] = 0;
-    number[data->tid] = 0;
     cs_entries[data->tid] = 0;
  
-    //printf("hello from thr_func, thread id: %d at time %d\n", data->tid, (int)time(NULL));
     while(time(NULL) < stop)
     {
-	choosing[data->tid] = 1;
-	int i;
-	int max = 0;
-	for(i=0;i<thread_num;++i)
-	    if(max < number[i])
-		max = number[i];
-	number[data->tid] = max + 1;
-	choosing[data->tid] = 0;
-
-	for(i=0;i<thread_num;++i)
-	{
-	    while(choosing[i]);
-	    while((number[i] != 0) && ((number[i] < number[data->tid]) || (number[i] == number[data->tid] && i < data->tid)));
-	}
+	spin_lock(&thread_lock);
+	mfence();
 	
 	//critical section
 	assert(in_cs == 0);
@@ -55,11 +79,18 @@ void *thr_func(void *arg) {
 	assert(in_cs == 3);
 	in_cs = 0;
 	cs_entries[data->tid] += 1;
-	//printf("thread %d in CS with ticket number %d\n",data->tid,number[data->tid]);
 	//end of critical section
-	number[data->tid] = 0;
+
+	/* A fence is needed at the end of the critical section to ensure that all 
+	   threads see changes to shared data in the critical section.  Without
+	   this fence it should still provide mutual exclusion but data may not
+	   be correct. */
+	mfence();
+	spin_unlock(&thread_lock);
+
+	/* More fences shouldn't be needed since the first one prevents mutual exclusion
+	   from being broken and the second one ensures data coherence. */
     }
-    //printf("thread %d exiting\n",data->tid);
     pthread_exit(NULL);
 }
  
@@ -112,15 +143,14 @@ int main(int argc, char **argv) {
     }
 
   /* Arguments ok, so proceed */
-
+    thread_lock.serving = 0;
+    thread_lock.next = 0;
     pthread_t thr[thread_num];
     stop = time(NULL) + seconds;
     int i, rc;
     /* create a thread_data_t argument array */
     thread_data_t thr_data[thread_num];
 
-    choosing = malloc(sizeof(int) * thread_num);
-    number = malloc(sizeof(int) * thread_num);
     cs_entries = malloc(sizeof(int) * thread_num);
  
     /* create threads */

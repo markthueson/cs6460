@@ -2,11 +2,11 @@ CC=gcc
 CFLAGS=-c -O2 -Wall -Wextra -Werror
 LFLAGS=-lm -pthread
 
-all:	problem_1.o
-	$(CC) problem_1.o -o problem_1 $(LFLAGS)
+all:	problem_7.o
+	$(CC) problem_7.o -o problem_7 $(LFLAGS)
 
-problem_1.o:
-	$(CC) $(CFLAGS) problem_1.c
+problem_7.o:
+	$(CC) $(CFLAGS) problem_7.c
  
 clean:
-	rm -rf *o problem_1
+	rm -rf *o problem_7

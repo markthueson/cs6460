@@ -1,11 +1,12 @@
 CC=gcc
 CFLAGS=-c -O2 -Wall -Wextra -Werror
+LFLAGS=-lm -pthread
 
-all:	dev_access.o
-	$(CC) dev_access.o -o dev_access
+all:	problem_5.o
+	$(CC) problem_5.o -o problem_5 $(LFLAGS)
 
-dev_access.o:
-	$(CC) $(CFLAGS) dev_access.c
+problem_5.o:
+	$(CC) $(CFLAGS) problem_5.c
  
 clean:
-	rm -rf *o dev_access
+	rm -rf *o problem_5

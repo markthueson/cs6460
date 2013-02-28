@@ -1,0 +1,11 @@
+CC=gcc
+CFLAGS=-c -O2 -Wall -Wextra -Werror
+
+all:	problem_6.o
+	$(CC) problem_6.o -o problem_6 
+
+problem_6.o:
+	$(CC) $(CFLAGS) problem_6.c
+ 
+clean:
+	rm -rf *o problem_6

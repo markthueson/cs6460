@@ -19,6 +19,10 @@ typedef struct _thread_data_t {
     double stuff;
 } thread_data_t;
  
+void mfence (void) {
+  asm volatile ("mfence" : : : "memory");
+}
+
 /* thread function */
 void *thr_func(void *arg) {
     thread_data_t *data = (thread_data_t *)arg;
@@ -27,7 +31,6 @@ void *thr_func(void *arg) {
     number[data->tid] = 0;
     cs_entries[data->tid] = 0;
  
-    //printf("hello from thr_func, thread id: %d at time %d\n", data->tid, (int)time(NULL));
     while(time(NULL) < stop)
     {
 	choosing[data->tid] = 1;
@@ -37,6 +40,13 @@ void *thr_func(void *arg) {
 	    if(max < number[i])
 		max = number[i];
 	number[data->tid] = max + 1;
+	/* A fence is needed here to make sure that another thread doesn't see the next step
+	   of setting choosing to 0 without seeing the change to the number.  Without this
+	   fence it would be possible for a thread with a larger number (or equal number and
+	   higher id) to access the critical section out of order.  This would also cause the
+	   thread with the smaller number to enter the critical section when it reaches it, breaking
+	   mutual exclusion. */
+	mfence();
 	choosing[data->tid] = 0;
 
 	for(i=0;i<thread_num;++i)
@@ -55,11 +65,18 @@ void *thr_func(void *arg) {
 	assert(in_cs == 3);
 	in_cs = 0;
 	cs_entries[data->tid] += 1;
-	//printf("thread %d in CS with ticket number %d\n",data->tid,number[data->tid]);
 	//end of critical section
+
+	/* A fence is needed at the end of the critical section to ensure that all 
+	   threads see changes to shared data in the critical section.  Without
+	   this fence it should still provide mutual exclusion but data may not
+	   be correct. */
+	mfence();
 	number[data->tid] = 0;
+
+	/* More fences shouldn't be needed since the first one prevents mutual exclusion
+	   from being broken and the second one ensures data coherence. */
     }
-    //printf("thread %d exiting\n",data->tid);
     pthread_exit(NULL);
 }
  
