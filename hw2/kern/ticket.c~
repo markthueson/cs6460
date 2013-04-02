@@ -109,14 +109,20 @@ ticket_read(struct file *filp, char __user *buf, size_t count,
   // your code starts here
   if(count == 4)
   {
-    int number = dev->ticket_num;
-    retval = copy_to_user(buf,&number,count);
-    printk("issue ticket %x buffer %x\n",number,*buf);
+    unsigned int i = dev->ticket_num;
+    unsigned char kbuf[4];
+    kbuf[0] = (i >> 24) & 0xFF;
+    kbuf[1] = (i >> 16) & 0xFF;
+    kbuf[2] = (i >> 8) & 0xFF;
+    kbuf[3] = i & 0xFF;
+    printk("ticket %02x%02x%02x%02x\n",(unsigned char)buf[0],(unsigned char)buf[1],(unsigned char)buf[2],(unsigned char)buf[3]);
+    retval = copy_to_user(buf,kbuf,count);
     //retval = copy_to_user(buf,&(dev->ticket_num),count);
-    //printk("issue ticket %x buffer %x\n",dev->ticket_num,*buf);
+    //printk("issue ticket %x buffer %x\n",(int)dev->ticket_num,*buf);
+    //printk("issue ticket %d buffer %d\n",(int)dev->ticket_num,*buf);
     if(retval == 0)
     {
-      dev->ticket_num += 1;
+      dev->ticket_num = dev->ticket_num + 1;
       retval = count;
     }
     else
@@ -172,7 +178,7 @@ ticket_construct_device(struct ticket_dev *dev, int minor,
     
   cdev_init(&dev->cdev, &ticket_fops);
   dev->cdev.owner = THIS_MODULE;
-  dev->ticket_num = 120;
+  dev->ticket_num = 1000;
     
   err = cdev_add(&dev->cdev, devno, 1);
   if (err)

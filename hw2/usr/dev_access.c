@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <string.h>
 
 int main(int argc,char *argv[])
 {
@@ -34,7 +35,7 @@ int main(int argc,char *argv[])
 
     /* Error if argument is not 0, 1, or 2*/
 
-    if (endptr == argv[1] || *endptr != '\0' || val < 0 || val > 2) {
+    if (endptr == argv[1] || *endptr != '\0' || val < 0 || val > 3) {
         fprintf(stderr, "Invalid argument\n");
         fprintf(stderr, "Usage: %s [0-2]\n",argv[0]);
         exit(EXIT_FAILURE);
@@ -141,20 +142,21 @@ int main(int argc,char *argv[])
 	    exit(EXIT_FAILURE);
 	}
 	int i = 0;
-	char buf[4];
-	printf("pre %x\n",*buf);
+	unsigned char buf[4];
 	for(i=0;i<10;++i)
 	{
-	    int i = read(fd,buf,4);
-	    if(i != 4)
+	    int j = read(fd,buf,4);
+	    if(j != 4)
 	    {
 		fprintf(stderr,"Error reading from ticket0\n");
 		exit(EXIT_FAILURE);
 	    }
 	    else
 	    {
-		printf("ticket %x\n",(unsigned int)*buf);
-		printf("ticket %d\n",(int)*buf);
+		unsigned int ticket = buf[0] << 24 | buf[1] << 16 | buf[2] << 8 | buf[3];
+		printf("ticket is %u\n",ticket);
+		//printf("ticket %x\n",(int)*buf);
+		//printf("ticket %d unsigned %u\n",(int)*buf,(int)*buf);
 	    }
 	    sleep(1);
 	}
@@ -164,6 +166,18 @@ int main(int argc,char *argv[])
 	    fprintf(stderr,"Could not close ticket0\n");
 	    exit(EXIT_FAILURE);
 	}
+    }
+    else if (val == 3)
+    {
+	unsigned int i = 1000;
+	unsigned char buf[4];
+	buf[0] = (i >> 24) & 0xFF;
+	buf[1] = (i >> 16) & 0xFF;
+	buf[2] = (i >> 8) & 0xFF;
+	buf[3] = i & 0xFF;
+	printf("%02x%02x%02x%02x\n",buf[0],buf[1],buf[2],buf[3]);
+	unsigned int j = buf[0] << 24 | buf[1] << 16 | buf[2] << 8 | buf[3];
+	printf("j is %u hex %x\n",j,j);
     }
 
     exit(EXIT_SUCCESS);
