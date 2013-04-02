@@ -1,0 +1,12 @@
+Producer 0 queued 2853322 items
+Producer 1 queued 2895937 items
+Producer 2 queued 2823390 items
+Producer 3 queued 743241 items
+Producer 4 queued 2911468 items
+Consumer 5 dequeued 3158607 items
+Consumer 6 dequeued 730001 items
+Consumer 7 dequeued 2769692 items
+Consumer 8 dequeued 2987676 items
+Consumer 9 dequeued 2581351 items
+Std dev of Producers is 851683.627038
+Std dev of Consumers is 879655.519906

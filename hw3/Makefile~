@@ -1,0 +1,12 @@
+CC=gcc
+CFLAGS=-c -O2 -Wall -Wextra -Werror
+LFLAGS=-lm -pthread
+
+all:	problem_5.o
+	$(CC) problem_5.o -o problem_5 $(LFLAGS)
+
+problem_5.o:
+	$(CC) $(CFLAGS) problem_5.c
+ 
+clean:
+	rm -rf *o problem_5

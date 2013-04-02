@@ -1,0 +1,92 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <limits.h>
+#include <assert.h>
+
+struct _queue {
+    int array[32];
+    int push;
+    int pull;
+    int count;
+};
+
+struct _queue queue;
+
+int enq(int number)
+{
+    if(queue.count == 32)
+	return 0;
+
+    queue.array[queue.push] = number;
+    queue.push = (queue.push+1)%32;
+    queue.count += 1;
+    return 1;
+}
+
+int deq(int *value)
+{
+    if(queue.count == 0)
+	return 0;
+
+    *value = queue.array[queue.pull];
+    queue.pull = (queue.pull+1)%32;
+    queue.count -= 1;
+    return 1;
+}
+
+int main(int argc, char **argv) {
+    /* Error if not 0 arguments */
+    if (argc != 1) 
+    {
+        fprintf(stderr, "Incorrect number of arguments\n");
+        fprintf(stderr, "Usage: %s\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+    
+    /* Test adding from empty to full and bounds */
+    int i;
+    for(i=0;i<32;++i)
+    {
+	assert(enq(i) == 1);
+    }
+    assert(enq(0) == 0);
+
+    /* Test removing from  full to empty and bounds */
+    for(i=0;i<32;++i)
+    {
+	int retval;
+	assert(deq(&retval) == 1);
+	assert(retval == i);
+    }
+    assert(deq(&i) == 0);
+
+    //test sequence of adds and removes beyond length of queue
+    int test[50];
+    for(i=0;i<50;++i)
+	test[i] = rand();
+    int add = 0;
+    int remove = 0;
+    int retval;
+    for(i=0;i<10;++i)
+    {
+	assert(enq(test[add++]) == 1);
+	assert(enq(test[add++]) == 1);
+	assert(enq(test[add++]) == 1);
+	assert(enq(test[add++]) == 1);
+	assert(enq(test[add++]) == 1);
+	assert(deq(&retval) == 1);
+	assert(retval == test[remove++]);
+	assert(deq(&retval) == 1);
+	assert(retval == test[remove++]);
+	assert(deq(&retval) == 1);
+	assert(retval == test[remove++]);
+    }
+    while(deq(&retval))
+    {
+	assert(retval == test[remove]);
+	remove += 1;
+    }
+ 
+    return EXIT_SUCCESS;
+}
