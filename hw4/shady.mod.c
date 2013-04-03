@@ -30,6 +30,7 @@ __attribute__((section("__versions"))) = {
 	{ 0x42119286, "mutex_unlock" },
 	{ 0xea5bac94, "mutex_lock_killable" },
 	{ 0x50eedeb8, "printk" },
+	{ 0xc5734835, "current_task" },
 	{ 0x7485e15e, "unregister_chrdev_region" },
 	{ 0x6dcd7881, "class_destroy" },
 	{ 0x37a0cba, "kfree" },
@@ -44,4 +45,4 @@ __attribute__((section(".modinfo"))) =
 "depends=";
 
 
-MODULE_INFO(srcversion, "7D2219DC2434D5AAAE64856");
+MODULE_INFO(srcversion, "9B3EE469EC08456E1F74F2D");
