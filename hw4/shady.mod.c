@@ -26,9 +26,10 @@ __attribute__((section("__versions"))) = {
 	{ 0x12da5bb2, "__kmalloc" },
 	{ 0x34d76c42, "__class_create" },
 	{ 0x29537c9e, "alloc_chrdev_region" },
-	{ 0x50eedeb8, "printk" },
+	{ 0x15568631, "lookup_address" },
 	{ 0x42119286, "mutex_unlock" },
 	{ 0xea5bac94, "mutex_lock_killable" },
+	{ 0x50eedeb8, "printk" },
 	{ 0x7485e15e, "unregister_chrdev_region" },
 	{ 0x6dcd7881, "class_destroy" },
 	{ 0x37a0cba, "kfree" },
@@ -43,4 +44,4 @@ __attribute__((section(".modinfo"))) =
 "depends=";
 
 
-MODULE_INFO(srcversion, "72D793380CD3B31807DE9E3");
+MODULE_INFO(srcversion, "7D2219DC2434D5AAAE64856");
