@@ -96,19 +96,17 @@ sleepy_read(struct file *filp, char __user *buf, size_t count,
     return -EINTR;
 	
   /* YOUR CODE HERE */
-  if(!mutex_lock_killable(&dev->version_mutex))
+  if(!mutex_lock_killable(&dev->version_mutex))  //protect concurrent access to version number
   {
     dev->version += 1;
     mutex_unlock(&dev->version_mutex);
-    //printk("sleepy about to wake: %d\n",(dev->version-1));
-    wake_up_interruptible(&dev->dev_wq);
+    wake_up_interruptible(&dev->dev_wq);	//wake processes for this device only
   }
   else
     retval = -EINTR;
   /* END YOUR CODE */
 	
   mutex_unlock(&dev->sleepy_mutex);
-  //printk("sleepy read return\n");
   return retval;
 }
                 
@@ -123,34 +121,26 @@ sleepy_write(struct file *filp, const char __user *buf, size_t count,
     return -EINTR;
 	
   /* YOUR CODE HERE */
-  if(count == 4)	
+  if(count == 4)	//return error if count is not 4 bytes
   {
-    //printk("sleepy write\n");
     int kbuf;
-    if(!copy_from_user(&kbuf,buf,count))
+    if(!copy_from_user(&kbuf,buf,count))  //return error if copy fails
     {
-      //printk("sleepy write got %d\n",kbuf);
       if(kbuf > 0)		//only sleep if int is positive
       {
-	if(!mutex_lock_killable(&dev->version_mutex))
+	if(!mutex_lock_killable(&dev->version_mutex))  //lock to access version number
 	{
 	  int my_version = dev->version;
 	  mutex_unlock(&dev->version_mutex);
-	  unsigned long start = jiffies;
-	  unsigned long sleep_time = kbuf*HZ;
-	  unsigned long end = start + sleep_time;
-	  //printk("sleepy jiffies %lu until %lu HZ is %d version %d\n",start,end,HZ,my_version);
-	  mutex_unlock(&dev->sleepy_mutex);
+	  unsigned long start = jiffies;		//take a time stamp
+	  unsigned long sleep_time = kbuf*HZ;		//calculate length of desired sleep in jiffies
+	  unsigned long end = start + sleep_time;  //calculate end time (wake time without interrupt)
+	  mutex_unlock(&dev->sleepy_mutex);	//release so other writes/reads have access while asleep
+	  //sleep until end is reached or a read to this device is performed
 	  if(wait_event_interruptible_timeout(dev->dev_wq,my_version != dev->version,sleep_time))
 	  {
-	    //printk("sleepy interrupted\n");
-	    retval = (end-jiffies)/HZ;
+	    retval = (end-jiffies)/HZ;  //if woken up calculate seconds remaining to sleep
 	  }
-	  else
-	  {
-	    //printk("sleepy time out at %lu myversion %d version %d\n",jiffies,my_version,dev->version);
-	  }
-
 	}
 	else
 	  retval = -EINTR;

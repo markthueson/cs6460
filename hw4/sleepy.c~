@@ -143,12 +143,12 @@ sleepy_write(struct file *filp, const char __user *buf, size_t count,
 	  mutex_unlock(&dev->sleepy_mutex);
 	  if(wait_event_interruptible_timeout(dev->dev_wq,my_version != dev->version,sleep_time))
 	  {
-	    printk("sleepy interrupted\n");
+	    //printk("sleepy interrupted\n");
 	    retval = (end-jiffies)/HZ;
 	  }
 	  else
 	  {
-	    printk("sleepy time out at %lu myversion %d version %d\n",jiffies,my_version,dev->version);
+	    //printk("sleepy time out at %lu myversion %d version %d\n",jiffies,my_version,dev->version);
 	  }
 
 	}
