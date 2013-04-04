@@ -48,8 +48,6 @@ module_param(sleepy_ndevices, int, S_IRUGO);
 static unsigned int sleepy_major = 0;
 static struct sleepy_dev *sleepy_devices = NULL;
 static struct class *sleepy_class = NULL;
-static DECLARE_WAIT_QUEUE_HEAD(wq);
-static int flag = 0;
 /* ================================================================ */
 
 int 
@@ -98,10 +96,19 @@ sleepy_read(struct file *filp, char __user *buf, size_t count,
     return -EINTR;
 	
   /* YOUR CODE HERE */
-
+  if(!mutex_lock_killable(&dev->version_mutex))
+  {
+    dev->version += 1;
+    mutex_unlock(&dev->version_mutex);
+    //printk("sleepy about to wake: %d\n",(dev->version-1));
+    wake_up_interruptible(&dev->dev_wq);
+  }
+  else
+    retval = -EINTR;
   /* END YOUR CODE */
 	
   mutex_unlock(&dev->sleepy_mutex);
+  //printk("sleepy read return\n");
   return retval;
 }
                 
@@ -118,24 +125,35 @@ sleepy_write(struct file *filp, const char __user *buf, size_t count,
   /* YOUR CODE HERE */
   if(count == 4)	
   {
-    printk("sleepy write\n");
+    //printk("sleepy write\n");
     int kbuf;
     if(!copy_from_user(&kbuf,buf,count))
     {
-      printk("sleepy write got %d\n",kbuf);
+      //printk("sleepy write got %d\n",kbuf);
       if(kbuf > 0)		//only sleep if int is positive
       {
-	unsigned long start = jiffies;
-	unsigned long sleep_time = kbuf*HZ;
-	unsigned long end = start + sleep_time;
-	printk("sleepy jiffies %lu until %lu HZ is %d\n",start,end,HZ);
-	if(wait_event_interruptible_timeout(wq,time_after_eq(jiffies,end),sleep_time))
+	if(!mutex_lock_killable(&dev->version_mutex))
 	{
-	  printk("sleepy interrupted\n");
-	  retval = (end-jiffies)/HZ;
+	  int my_version = dev->version;
+	  mutex_unlock(&dev->version_mutex);
+	  unsigned long start = jiffies;
+	  unsigned long sleep_time = kbuf*HZ;
+	  unsigned long end = start + sleep_time;
+	  //printk("sleepy jiffies %lu until %lu HZ is %d version %d\n",start,end,HZ,my_version);
+	  mutex_unlock(&dev->sleepy_mutex);
+	  if(wait_event_interruptible_timeout(dev->dev_wq,my_version != dev->version,sleep_time))
+	  {
+	    //printk("sleepy interrupted\n");
+	    retval = (end-jiffies)/HZ;
+	  }
+	  else
+	  {
+	    //printk("sleepy time out at %lu myversion %d version %d\n",jiffies,my_version,dev->version);
+	  }
+
 	}
 	else
-	  printk("sleepy time out at %lu\n",jiffies);
+	  retval = -EINTR;
       }
     }
     else
@@ -182,6 +200,8 @@ sleepy_construct_device(struct sleepy_dev *dev, int minor,
   /* Memory is to be allocated when the device is opened the first time */
   dev->data = NULL;     
   mutex_init(&dev->sleepy_mutex);
+  mutex_init(&dev->version_mutex);
+  init_waitqueue_head(&dev->dev_wq);
     
   cdev_init(&dev->cdev, &sleepy_fops);
   dev->cdev.owner = THIS_MODULE;

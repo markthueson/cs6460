@@ -20,7 +20,7 @@ struct sleepy_dev {
   unsigned char *data;
   struct mutex sleepy_mutex; 
   struct mutex version_mutex;
-  volatile int version;
+  int version;
   wait_queue_head_t dev_wq;
   struct cdev cdev;
 };

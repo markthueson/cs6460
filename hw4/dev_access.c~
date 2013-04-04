@@ -16,16 +16,30 @@ int main(int argc,char *argv[])
 
     if(val == 0)
     {
-	int fd = open("/dev/sleepy0",O_WRONLY);
+
+	int rw = strtol(argv[2],&endptr,10);
+	int dev = strtol(argv[3],&endptr,10);
+        char sleepydev[13];
+        sprintf(sleepydev,"/dev/sleepy%d",dev);
+
+	int fd;
+	if(rw == 1)
+	    fd = open(sleepydev,O_WRONLY);
+	else
+	    fd = open(sleepydev,O_RDONLY);
 	if(fd < 0)
 	{
 	    fprintf(stderr, "Could not open sleepy0\n");
 	    exit(EXIT_FAILURE);
 	}
 	int *buf = malloc(sizeof(int));
-	*buf = strtoi(argv[1],&endptr,10);
+	*buf = (int)strtol(argv[1],&endptr,10);
 	printf("buf is %d\n",*buf);
-	    int i = write(fd,buf,sizeof(int));
+	int i;
+	if(rw == 1)
+	    i = write(fd,buf,sizeof(int));
+	else
+	    i = read(fd,buf,sizeof(int));
 	    if(i == sizeof(int))
 		printf("%i\n",i);
 	    else

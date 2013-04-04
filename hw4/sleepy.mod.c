@@ -22,10 +22,13 @@ __attribute__((section("__versions"))) = {
 	{ 0xc60796c9, "device_create" },
 	{ 0x80d78e54, "cdev_add" },
 	{ 0xd46f48e8, "cdev_init" },
+	{ 0x48eb0c0d, "__init_waitqueue_head" },
 	{ 0x466cddcf, "__mutex_init" },
 	{ 0x12da5bb2, "__kmalloc" },
 	{ 0x34d76c42, "__class_create" },
 	{ 0x29537c9e, "alloc_chrdev_region" },
+	{ 0x50eedeb8, "printk" },
+	{ 0xe45f60d8, "__wake_up" },
 	{ 0x75bb675a, "finish_wait" },
 	{ 0xd62c833f, "schedule_timeout" },
 	{ 0x622fa02a, "prepare_to_wait" },
@@ -33,7 +36,6 @@ __attribute__((section("__versions"))) = {
 	{ 0xc5734835, "current_task" },
 	{ 0x7d11c268, "jiffies" },
 	{ 0x362ef408, "_copy_from_user" },
-	{ 0x50eedeb8, "printk" },
 	{ 0x42119286, "mutex_unlock" },
 	{ 0xea5bac94, "mutex_lock_killable" },
 	{ 0x7485e15e, "unregister_chrdev_region" },
@@ -50,4 +52,4 @@ __attribute__((section(".modinfo"))) =
 "depends=";
 
 
-MODULE_INFO(srcversion, "66265088B75F3FAC2AE92A6");
+MODULE_INFO(srcversion, "E7189DE8465452832AF5EFD");
