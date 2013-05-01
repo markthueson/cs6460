@@ -110,23 +110,80 @@ static inline int get_block(struct inode * inode, sector_t block,
 
 	printk("get block %lu\n",(unsigned long)block);
 	unsigned int * i_zone = minix_i(inode)->u.i2_data;
-	printk("i_zone block %u\n",i_zone[block]);
-	if(!create && block < 10)
+	if(!create)
 	{
-		if(i_zone[block] == 0)
+		unsigned int block_count = 0;
+		int found = 0;
+		int i = 0;
+		while(!found && i < 10 && i_zone[i] != 0)
+		{
+			unsigned int extent = i_zone[i] & 0xff;
+			unsigned int firstblock = (i_zone[i] & 0xffffff00)>>8;
+
+			printk("find %lu start at %u until %u count is %u\n",(unsigned long)block,firstblock,firstblock+extent,block_count);
+			if(block < (block_count+extent))
+				found = firstblock;
+			else
+			{
+				block_count += extent;
+				++i;
+			}
+		}
+		if(found)
+		{
+			printk("found block %lu in slot %d start %u\n",(unsigned long)block,i,found);
+			map_bh(bh, inode->i_sb, (found+block-block_count));
+			return 0;
+		}
+		else
 			return -EIO;
-		map_bh(bh, inode->i_sb, i_zone[block]);
-		return 0;
 	}
-	else if(create && block < 10)
+	else if(create)
 	{
-		i_zone[block] = minix_new_block(inode);
-		mark_inode_dirty(inode);
-		printk("i_zone new block %u\n",i_zone[block]);
-		map_bh(bh, inode->i_sb, i_zone[block]);
+		//get new block
+		unsigned int myblock = minix_new_block(inode);
+		printk("creating block %u\n",myblock);
+		int found = 0;
+		int i = 0;
+		//check if it can be added to an existing extent or it needs new slot
+		while(!found && i < 10 && i_zone[i] != 0)
+		{
+			unsigned int extent = i_zone[i] & 0xff;
+			unsigned int firstblock = (i_zone[i] & 0xffffff00)>>8;
+
+			//check if the extent is full
+			printk("create slot start %u to %u compare %u\n",firstblock,firstblock+extent,myblock);
+			if(extent < 255 && ((firstblock + extent) == myblock))
+				found = 1;
+			else
+				++i;
+		}
+		//no more slots
+		if(i > 9)
+			return -EIO;
+		//add onto an existing extent
+		else if(found)
+		{
+			unsigned int extent = i_zone[i] & 0xff;
+			unsigned int firstblock = (i_zone[i] & 0xffffff00)>>8;
+
+			map_bh(bh, inode->i_sb, firstblock+extent);
+			i_zone[i] += 1;
+			mark_inode_dirty(inode);
+			printk("added to extent %d %d\n",i,i_zone[i]);
+		}
+		//add new slot
+		else
+		{
+			i_zone[i] = myblock<<8;
+			i_zone[i] += 1;
+			mark_inode_dirty(inode);
+			map_bh(bh, inode->i_sb, myblock);
+			printk("new slot added %d %d\n",i,i_zone[i]);
+		}
+
 		return 0;
 	}
-	printk("file exceeds maximum\n");
 	return -EIO;
 }
 

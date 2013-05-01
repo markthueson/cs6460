@@ -24,7 +24,6 @@ __attribute__((section("__versions"))) = {
 	{ 0x794a2c29, "kmalloc_caches" },
 	{ 0x12da5bb2, "__kmalloc" },
 	{ 0x405c1144, "get_seconds" },
-	{ 0x82819580, "mark_buffer_dirty_inode" },
 	{ 0x65799580, "__bread" },
 	{ 0xeb9d3d9d, "generic_file_llseek" },
 	{ 0x51df5968, "__mark_inode_dirty" },
@@ -33,7 +32,6 @@ __attribute__((section("__versions"))) = {
 	{ 0x847f182b, "page_address" },
 	{ 0x3fcac3d7, "block_write_begin" },
 	{ 0x25820c64, "fs_overflowuid" },
-	{ 0xc01cf848, "_raw_read_lock" },
 	{ 0xdb79b576, "__lock_page" },
 	{ 0xae739097, "generic_file_aio_read" },
 	{ 0x94ccfb5a, "block_read_full_page" },
@@ -52,7 +50,6 @@ __attribute__((section("__versions"))) = {
 	{ 0xa1c76e0a, "_cond_resched" },
 	{ 0xb4390f9a, "mcount" },
 	{ 0x1c1fd9ed, "kmem_cache_free" },
-	{ 0x7f658e80, "_raw_write_lock" },
 	{ 0xed93f29e, "__kunmap_atomic" },
 	{ 0xe0bd2848, "setattr_copy" },
 	{ 0xef716f12, "page_symlink" },
@@ -68,9 +65,7 @@ __attribute__((section("__versions"))) = {
 	{ 0x74117b38, "generic_file_mmap" },
 	{ 0xe2fc4044, "kmap" },
 	{ 0x3b056a37, "block_write_full_page" },
-	{ 0x63580ed, "bdevname" },
 	{ 0x8336c26c, "block_write_end" },
-	{ 0xf0fdf6cb, "__stack_chk_fail" },
 	{ 0x6babd437, "generic_write_end" },
 	{ 0x23451304, "do_sync_read" },
 	{ 0x33771543, "unlock_new_inode" },
@@ -88,13 +83,10 @@ __attribute__((section("__versions"))) = {
 	{ 0xeac8457c, "ihold" },
 	{ 0x2e60bace, "memcpy" },
 	{ 0x50f5e532, "call_rcu_sched" },
-	{ 0x6128b5fc, "__printk_ratelimit" },
 	{ 0xf7df110, "vmtruncate" },
-	{ 0x48e60ad1, "block_truncate_page" },
 	{ 0xed5cd2f9, "sb_set_blocksize" },
 	{ 0xb62f4280, "generic_readlink" },
 	{ 0x33842f27, "put_page" },
-	{ 0x11abc1dc, "__bforget" },
 	{ 0x74c134b9, "__sw_hweight32" },
 	{ 0x419a8915, "__block_write_begin" },
 	{ 0x79c4fd9b, "mark_buffer_dirty" },
@@ -120,4 +112,4 @@ __attribute__((section(".modinfo"))) =
 "depends=";
 
 
-MODULE_INFO(srcversion, "A5876723A0ACD1139732916");
+MODULE_INFO(srcversion, "07D09259C929A3A9D4CA822");

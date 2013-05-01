@@ -107,9 +107,15 @@ changed:
 static inline int get_block(struct inode * inode, sector_t block,
 			struct buffer_head *bh, int create)
 {
-
+	static int super = 0;
 	printk("get block %lu\n",(unsigned long)block);
 	unsigned int * i_zone = minix_i(inode)->u.i2_data;
+	if(!super)
+	{
+		map_bh(bh,inode->i_sb,i_zone[0]);
+		++super;
+		return 0;
+	}
 	if(!create)
 	{
 		unsigned int block_count = 0;
@@ -142,6 +148,7 @@ static inline int get_block(struct inode * inode, sector_t block,
 	{
 		//get new block
 		unsigned int myblock = minix_new_block(inode);
+		printk("creating block %u\n",myblock);
 		int found = 0;
 		int i = 0;
 		//check if it can be added to an existing extent or it needs new slot
@@ -169,7 +176,7 @@ static inline int get_block(struct inode * inode, sector_t block,
 			map_bh(bh, inode->i_sb, firstblock+extent);
 			i_zone[i] += 1;
 			mark_inode_dirty(inode);
-			printk("added to extent %d %d\n",i,i_zone[i]);
+			printk("added to extent starting at %d extent is now%d\n",firstblock,extent+1);
 		}
 		//add new slot
 		else
@@ -178,7 +185,7 @@ static inline int get_block(struct inode * inode, sector_t block,
 			i_zone[i] += 1;
 			mark_inode_dirty(inode);
 			map_bh(bh, inode->i_sb, myblock);
-			printk("new slot added %d %d\n",i,i_zone[i]);
+			printk("new slot added %d starting at %d\n",i,myblock);
 		}
 
 		return 0;
@@ -194,45 +201,6 @@ static inline int all_zeroes(block_t *p, block_t *q)
 	return 1;
 }
 
-static Indirect *find_shared(struct inode *inode,
-				int depth,
-				int offsets[DEPTH],
-				Indirect chain[DEPTH],
-				block_t *top)
-{
-	Indirect *partial, *p;
-	int k, err;
-
-	*top = 0;
-	for (k = depth; k > 1 && !offsets[k-1]; k--)
-		;
-	partial = get_branch(inode, k, offsets, chain, &err);
-
-	write_lock(&pointers_lock);
-	if (!partial)
-		partial = chain + k-1;
-	if (!partial->key && *partial->p) {
-		write_unlock(&pointers_lock);
-		goto no_top;
-	}
-	for (p=partial;p>chain && all_zeroes((block_t*)p->bh->b_data,p->p);p--)
-		;
-	if (p == chain + k - 1 && p > chain) {
-		p->p--;
-	} else {
-		*top = *p->p;
-		*p->p = 0;
-	}
-	write_unlock(&pointers_lock);
-
-	while(partial > p)
-	{
-		brelse(partial->bh);
-		partial--;
-	}
-no_top:
-	return partial;
-}
 
 static inline void free_data(struct inode *inode, block_t *p, block_t *q)
 {
@@ -247,85 +215,26 @@ static inline void free_data(struct inode *inode, block_t *p, block_t *q)
 	}
 }
 
-static void free_branches(struct inode *inode, block_t *p, block_t *q, int depth)
-{
-	struct buffer_head * bh;
-	unsigned long nr;
-
-	if (depth--) {
-		for ( ; p < q ; p++) {
-			nr = block_to_cpu(*p);
-			if (!nr)
-				continue;
-			*p = 0;
-			bh = sb_bread(inode->i_sb, nr);
-			if (!bh)
-				continue;
-			free_branches(inode, (block_t*)bh->b_data,
-				      block_end(bh), depth);
-			bforget(bh);
-			minix_free_block(inode, nr);
-			mark_inode_dirty(inode);
-		}
-	} else
-		free_data(inode, p, q);
-}
 
 static inline void truncate (struct inode * inode)
 {
-	struct super_block *sb = inode->i_sb;
-	block_t *idata = i_data(inode);
-	int offsets[DEPTH];
-	Indirect chain[DEPTH];
-	Indirect *partial;
-	block_t nr = 0;
-	int n;
-	int first_whole;
-	long iblock;
-
-	iblock = (inode->i_size + sb->s_blocksize -1) >> sb->s_blocksize_bits;
-	block_truncate_page(inode->i_mapping, inode->i_size, get_block);
-
-	n = block_to_path(inode, iblock, offsets);
-	if (!n)
-		return;
-
-	if (n == 1) {
-		free_data(inode, idata+offsets[0], idata + DIRECT);
-		first_whole = 0;
-		goto do_indirects;
-	}
-
-	first_whole = offsets[0] + 1 - DIRECT;
-	partial = find_shared(inode, n, offsets, chain, &nr);
-	if (nr) {
-		if (partial == chain)
-			mark_inode_dirty(inode);
-		else
-			mark_buffer_dirty_inode(partial->bh, inode);
-		free_branches(inode, &nr, &nr+1, (chain+n-1) - partial);
-	}
-	/* Clear the ends of indirect blocks on the shared branch */
-	while (partial > chain) {
-		free_branches(inode, partial->p + 1, block_end(partial->bh),
-				(chain+n-1) - partial);
-		mark_buffer_dirty_inode(partial->bh, inode);
-		brelse (partial->bh);
-		partial--;
-	}
-do_indirects:
-	/* Kill the remaining (whole) subtrees */
-	while (first_whole < DEPTH-1) {
-		nr = idata[DIRECT+first_whole];
-		if (nr) {
-			idata[DIRECT+first_whole] = 0;
-			mark_inode_dirty(inode);
-			free_branches(inode, &nr, &nr+1, first_whole+1);
+	/*
+	unsigned int * i_zone = minix_i(inode)->u.i2_data;
+	int i = 0;
+	for(i=0;i<10;++i)
+	{
+		if(i_zone[i])
+		{
+			unsigned int extent = i_zone[i] & 0xff;
+			unsigned int base = (i_zone[i]&0xffffff00)>>8;
+			int j = 0;
+			for(j=0;j<extent;++j)
+			{
+				minix_free_block(inode,base+j);
+			}
 		}
-		first_whole++;
 	}
-	inode->i_mtime = inode->i_ctime = CURRENT_TIME_SEC;
-	mark_inode_dirty(inode);
+	*/
 }
 
 static inline unsigned nblocks(loff_t size, struct super_block *sb)
