@@ -1,0 +1,20 @@
+Mark Thueson
+cs6460 hw5
+
+The extents use the same inode structure that is used for the normal minix filesystem but packs both the starting block number and the extent into one 32 bit integer. 24 bits are used to represent the block number and 8 bits are used to track the length of the extent. Each of these values can be extracted by using a simple mask (and a shift for the first block number).
+Due to this packing the maximum file size differs from the original system. In the worst case the blocks would all be scattered and the file inode could only track 10 blocks. This would result in a maximum file size of 10KB (since each block is 1KB).  In the best case scenario there are a maximum of 255 blocks that are tracked by each extent. This yields a maximum file size of 2550KB or roughly 2.5MB.
+
+There is one large flaw in the code that I was unable to resolve. When the file system is created it seems to create the root inode using the original format. When the filesystem is mounted, my minix module tries to unpack the block number and messes everything up. I couldn't seem to find a way to fix this. However in order to test my actual extent functionality I created a hack to get around that. The very first call to get_block after the module is loaded doesn't perform the unpacking, this mitigated the problem for me and I was able to successfully test the remaining functionality. Unfortunately it also means that in order for my module to work correctly it must be unloaded and loaded each time the filesystem is unmounted and mounted again.
+
+When this special handling is done I am able to create files and directories that all remain persistent through mounts, deletions, etc. My primary testing involved mixtures of the following actions:
+-File creation
+-File deletion
+-Directory creation
+-Directory deletion
+-Copying files
+-Replacing files
+-Concatenating files
+-Opening/reading files
+-etc.
+
+There are also many printk statements built in so the extents can be seen as they either are extended upon or when a new entry must be added since it is non-contiguous. Since I've run out of time I haven't handled the case where a block is requested that should allocate multiple blocks. This would be a simple addition to check the final existing block and allocate until the requested block is created. I also believe there may be a bug that doesn't free all the blocks correctly so some space may be being wasted over time. This means a utility like fsck would have to be run more frequently than on most systems.
